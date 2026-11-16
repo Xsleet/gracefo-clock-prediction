@@ -19,7 +19,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 EPOCH = datetime(2000, 1, 1, 12)
 STEP = 10
 CONTEXT = 2160  # 6 hours at 10 seconds

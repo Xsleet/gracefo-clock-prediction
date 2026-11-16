@@ -10,7 +10,7 @@ from timesfm_backend import MODEL_REVISION, MODEL_SHA256
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parent / "models/timesfm-3.0-pytorch")
+    parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "models/timesfm-3.0-pytorch")
     args = parser.parse_args()
     snapshot_download(
         repo_id="google/timesfm-3.0-pytorch", revision=MODEL_REVISION,

@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 
@@ -55,7 +58,7 @@ class ForecastTests(unittest.TestCase):
 
     def test_baselines_match_archived_experiment(self):
         _, summary = evaluate(self.windows)
-        with (ROOT / "reference/metrics_summary.csv").open(encoding="utf-8-sig", newline="") as stream:
+        with (ROOT / "advanced/reference/metrics_summary.csv").open(encoding="utf-8-sig", newline="") as stream:
             reference = {(r["satellite"], r["method"], int(r["horizon_minutes"])): float(r["rmse_ns"])
                          for r in csv.DictReader(stream)}
         for row in summary:

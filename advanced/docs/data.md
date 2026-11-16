@@ -20,7 +20,7 @@
 
 从 [PO.DAAC 数据集合](https://podaac.jpl.nasa.gov/dataset/GRACEFO_L1B_ASCII_GRAV_JPL_RL04)进入 Earthdata Search，选择 2025-06-01 至 2025-06-03 并下载日产品（下载通常需要 Earthdata 登录）。解压后选择 `CLK1B_2025-06-DD_C_04.txt` 和 D 星对应文件，不要把 GNV1B 轨道文件当钟差文件。
 
-下载凭据只保存在用户自己的环境中，不写入本仓库。数据集合、产品 DOI、许可证入口和致谢见 [DATA_SOURCES.md](../DATA_SOURCES.md)。
+下载凭据只保存在用户自己的环境中，不写入本仓库。数据集合、产品 DOI、许可证入口和致谢见 [DATA_SOURCES.md](../../DATA_SOURCES.md)。
 
 ## 固定合并规则
 
@@ -42,13 +42,13 @@
 以下路径只是示意：把三个文件放入 `data/raw`，在仓库根目录执行。输出必须指定新路径，避免覆盖附带样本。
 
 ```powershell
-.\.venv\Scripts\python.exe prepare_data.py data/raw/CLK1B_2025-06-01_C_04.txt data/raw/CLK1B_2025-06-02_C_04.txt data/raw/CLK1B_2025-06-03_C_04.txt --satellite C --output data/rebuilt/CLK1B_2025-06-01_to_2025-06-03_C.txt
+.\.venv\Scripts\python.exe advanced/prepare_data.py data/raw/CLK1B_2025-06-01_C_04.txt data/raw/CLK1B_2025-06-02_C_04.txt data/raw/CLK1B_2025-06-03_C_04.txt --satellite C --output data/rebuilt/CLK1B_2025-06-01_to_2025-06-03_C.txt
 ```
 
 把命令中的 C 全部改为 D，生成 D 星文件，然后：
 
 ```powershell
-.\.venv\Scripts\python.exe experiment.py --data-dir data/rebuilt --output-dir outputs/rebuilt
+.\.venv\Scripts\python.exe advanced/experiment.py --data-dir data/rebuilt --output-dir outputs/rebuilt
 ```
 
 源产品可能重新发布。先比较 manifest 的原始文件 SHA-256；相同文件和规则应得到相同输出哈希，源文件变化时不要强行对齐旧结果。

@@ -10,6 +10,8 @@
 - 原始文件头声明的数据使用政策：[NASA Earth Science Data Policy](https://science.nasa.gov/earth-science/earth-science-data/data-information-policy)。
 - [PO.DAAC 引用指南](https://podaac.jpl.nasa.gov/CitingPODAAC)。使用数据时应致谢 NASA/JPL、GRACE-FO 科学数据系统及 NASA/GFZ 联合任务。
 
-`data/sample/*.txt` 是本仓库处理得到的教学子集，不是官方原始文件。相邻 manifest 记录六份原始日文件的文件名和 SHA-256、处理规则、行数、输出哈希；记录中不包含本机路径。处理规则与再生方法见 [数据说明](docs/data.md)。
+`data/sample/*.txt` 是本仓库处理得到的教学子集，不是官方原始文件。相邻 manifest 记录六份原始日文件的文件名和 SHA-256、处理规则、行数、输出哈希；记录中不包含本机路径。处理规则与再生方法见 [数据说明](advanced/docs/data.md)。
 
 TimesFM 通过独立依赖安装，仓库不分发其源码或权重。其[源码](https://github.com/google-research/timesfm)使用 Apache-2.0；3.0 [权重许可证](https://huggingface.co/google/timesfm-3.0-pytorch/blob/main/LICENSE)限制下载权重的商业和生产用途。本项目的可选路径用于课堂和本地研究。CPU 多项式基线不依赖 TimesFM。
+
+简明版 `data/clock.csv` 从上述 C 星子集中提取固定的第一个实验窗口，只保留时间与钟差两列，详情见 [说明](data/README.md)。
