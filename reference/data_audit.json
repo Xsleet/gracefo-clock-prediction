@@ -1,0 +1,59 @@
+{
+  "C": {
+    "file": "CLK1B_2025-06-01_to_2025-06-03_C.txt",
+    "sha256": "2ef480833d36939ac6fbe920d92b5a67dd889368d4e3cd6338a89aa89c98c44a",
+    "records": 25981,
+    "start_receiver_time": "2025-05-31 23:55:00",
+    "end_receiver_time": "2025-06-04 00:05:00",
+    "step_counts_seconds": {
+      "10": 25980
+    },
+    "quality_flags": {
+      "0": 25981
+    },
+    "clock_ids": {
+      "-1": 25981
+    },
+    "gaps": [],
+    "changes_above_10_microseconds": [],
+    "note": "Large changes are reported, not removed based on forecast error. Gaps are never interpolated."
+  },
+  "D": {
+    "file": "CLK1B_2025-06-01_to_2025-06-03_D.txt",
+    "sha256": "4014cca9f323ff200f333f56e20588b2c22d02057a57f7dbdb524a9b2859ae91",
+    "records": 25951,
+    "start_receiver_time": "2025-05-31 23:55:00",
+    "end_receiver_time": "2025-06-04 00:05:00",
+    "step_counts_seconds": {
+      "10": 25948,
+      "290": 1,
+      "30": 1
+    },
+    "quality_flags": {
+      "0": 25951
+    },
+    "clock_ids": {
+      "-1": 25951
+    },
+    "gaps": [
+      {
+        "before": "2025-06-02 23:04:50",
+        "after": "2025-06-02 23:09:40",
+        "interval_seconds": 290
+      },
+      {
+        "before": "2025-06-02 23:09:40",
+        "after": "2025-06-02 23:10:10",
+        "interval_seconds": 30
+      }
+    ],
+    "changes_above_10_microseconds": [
+      {
+        "before": "2025-06-02 23:04:50",
+        "after": "2025-06-02 23:09:40",
+        "change_seconds": 0.010207993996815047
+      }
+    ],
+    "note": "Large changes are reported, not removed based on forecast error. Gaps are never interpolated."
+  }
+}

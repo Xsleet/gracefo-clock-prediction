@@ -1,0 +1,7 @@
+[
+  {
+    "satellite": "D",
+    "origin_receiver_time": "2025-06-03 00:00:00",
+    "reason": "Missing epochs inside history or holdout; no interpolation"
+  }
+]

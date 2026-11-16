@@ -1,0 +1,30 @@
+{
+  "satellite": "D",
+  "time_system": "receiver time, seconds since 2000-01-01 12:00:00; not UTC",
+  "target": "eps_time [s]; GPS Time = rcv_time + eps_time",
+  "source_product_doi": "10.5067/GFJPL-L1B04",
+  "source_files": [
+    {
+      "file": "CLK1B_2025-06-01_D_04.txt",
+      "sha256": "8f9ad6e16672855328975c0cdab6ae5891bc82a213222a8d5eef42d17b3a2867"
+    },
+    {
+      "file": "CLK1B_2025-06-02_D_04.txt",
+      "sha256": "3a925d3ef4f68b7b26c5703ae8fbeb9acd58b857d237889fa6dd70e25f0d9f27"
+    },
+    {
+      "file": "CLK1B_2025-06-03_D_04.txt",
+      "sha256": "181851af2d632094afc010110ef8d525434c1de252bd89bce4c8e1cbc4bff1ba"
+    }
+  ],
+  "merge_rule": "Keep qualflg == 0 records only; daily filenames ascending, last retained row at each epoch. No interpolation or clock alignment. Nonzero quality flags do not universally mean invalid data; this is a conservative pilot selection policy.",
+  "counts": {
+    "raw_records": 26084,
+    "nonzero_quality_records_removed": 10,
+    "duplicate_records": 123,
+    "different_bias_duplicate_records": 123,
+    "merged_records": 25951
+  },
+  "output_file": "CLK1B_2025-06-01_to_2025-06-03_D.txt",
+  "output_sha256": "4014cca9f323ff200f333f56e20588b2c22d02057a57f7dbdb524a9b2859ae91"
+}

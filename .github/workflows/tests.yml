@@ -1,0 +1,23 @@
+name: CPU teaching experiment
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python experiment.py --output-dir outputs/ci
+      - run: python verify_results.py outputs/ci
+      - run: python forecast.py data/sample/CLK1B_2025-06-01_to_2025-06-03_C.txt --satellite C --output outputs/future.csv
