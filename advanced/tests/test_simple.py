@@ -1,5 +1,6 @@
 """Keep the short teaching path aligned with its real source window."""
 import csv
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -21,7 +22,11 @@ class SimpleExampleTests(unittest.TestCase):
         self.assertTrue(np.all(np.diff(sample[:, 0]) == 10))
 
     def test_short_entrypoint_and_csv_metrics(self):
-        subprocess.run([sys.executable, str(ROOT / "main.py"), "--model", "linear"], check=True, capture_output=True)
+        # Emulate an English Windows console; Chinese progress must remain printable.
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        run = subprocess.run([sys.executable, str(ROOT / "main.py"), "--model", "linear"],
+                             check=True, capture_output=True, env=env)
+        self.assertIn("历史", run.stdout.decode("utf-8"))
         result = np.loadtxt(ROOT / "outputs/linear-cpu/prediction.csv", delimiter=",", skiprows=1)
         sample = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
         self.assertEqual(result.shape, (360, 4))

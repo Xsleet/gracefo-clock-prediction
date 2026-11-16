@@ -1,5 +1,6 @@
 """读 main.py 即可：读钟差 -> 用历史预测未来 -> 画误差图。"""
 import argparse
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -93,4 +94,6 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     main()
