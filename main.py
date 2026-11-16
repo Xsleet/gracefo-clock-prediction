@@ -43,9 +43,13 @@ def main():
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--model", choices=["timesfm", "linear"], default="timesfm")
     parser.add_argument("--checkpoint", default="google/timesfm-3.0-pytorch")
+    parser.add_argument("--finetuned", nargs="?", type=Path,
+                        const=ROOT / "outputs/finetune/head.pt", help="加入本机微调的预测头对比")
     args = parser.parse_args()
     if args.model == "linear" and args.device == "gpu":
         parser.error("线性示例使用 CPU；GPU 模式请用默认的 TimesFM。")
+    if args.finetuned and (args.model != "timesfm" or not args.finetuned.is_file()):
+        parser.error("微调对比需选择 TimesFM，并先运行 python finetune.py 生成预测头权重。")
 
     # 2. 读两列数据：接收机时间（秒）、钟差（秒）。先划分，后处理。
     data = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
@@ -64,7 +68,7 @@ def main():
     history_ns = (history - last) * 1e9
     print(f"历史 {len(history)} 点 -> 预报 {PREDICT_POINTS} 点，设备：{args.device}")
 
-    # 4. 三种模型都只读取历史；多项式对照也使用完整的 6 小时。
+    # 4. 各模型预测时只读取历史；多项式对照也使用完整的 6 小时。
     polynomial, periodic, period = polynomial_forecasts(history_ns, PREDICT_POINTS)
     # 保留 --model linear 快速示例：最近 10 分钟的斜率，从最后观测值延伸。
     slope, _ = np.polyfit(np.arange(-59, 1), history_ns[-60:], 1)
@@ -79,16 +83,29 @@ def main():
         model = TimesFM3Evaluator(ModelConfig(
             checkpoint_path=args.checkpoint, revision="43046b85ec22d584a13f8098c2ed39c889e129c2",
             device="cuda" if args.device == "gpu" else "cpu", per_core_batch_size=1))
-        with torch.inference_mode():
-            result = list(model.predict_batch(
-                [history_ns.astype(np.float32)], horizon=PREDICT_POINTS,
-                return_quantiles=False, make_positive=False, use_symmetric_averaging=False))
-        prediction = result[0].forecast.astype(np.float64)
+        def predict_timesfm():
+            with torch.inference_mode():
+                result = list(model.predict_batch(
+                    [history_ns.astype(np.float32)], horizon=PREDICT_POINTS,
+                    return_quantiles=False, make_positive=False, use_symmetric_averaging=False))
+            return result[0].forecast.astype(np.float64)
+        prediction = predict_timesfm()  # 先预测并保存原始模型结果，再加载微调权重。
     forecasts = {args.model: prediction, "polynomial": polynomial, "periodic": periodic}
+    if args.finetuned:
+        saved = torch.load(args.finetuned, map_location="cpu", weights_only=True)
+        meta = saved["metadata"]
+        if (meta["method"] != "output_head_finetuning" or
+                meta["revision"] != "43046b85ec22d584a13f8098c2ed39c889e129c2" or
+                meta["history_points"] != HISTORY_POINTS or meta["horizon_points"] != PREDICT_POINTS or
+                meta["step_seconds"] != 10 or meta["last_training_or_validation_epoch"] >= sample[0, 0]):
+            parser.error("微调权重配置不匹配，或其训练/验证数据与展示窗口重叠。")
+        model.model.output_head.load_state_dict(saved["head"], strict=True)
+        forecasts = {"timesfm": prediction, "finetuned": predict_timesfm(),
+                     "polynomial": polynomial, "periodic": periodic}
 
     # 5. 预测完成后才与真实值比较。RMSE 越小，预报越准。
     truth_ns = (truth - last) * 1e9
-    labels = {"timesfm": "TimesFM", "linear": "Linear (10 min)",
+    labels = {"timesfm": "TimesFM (original)", "finetuned": "TimesFM (head-tuned)", "linear": "Linear (10 min)",
               "polynomial": "Polynomial (degree 2)", "periodic": "Polynomial + periodic"}
     columns = [sample[HISTORY_POINTS:, 0], truth]
     header = ["receiver_seconds", "true_seconds"]
@@ -104,7 +121,8 @@ def main():
         header.extend([f"{name}_seconds", f"{name}_error_ns"])
 
     # 6. 只输出一个 CSV 和一张图。再次运行会更新同一目录。
-    output = ROOT / "outputs" / f"{args.model}-{args.device}"
+    run_name = "comparison" if args.finetuned else args.model
+    output = ROOT / "outputs" / f"{run_name}-{args.device}"
     output.mkdir(parents=True, exist_ok=True)
     np.savetxt(output / "prediction.csv", np.column_stack(columns),
         delimiter=",", header=",".join(header), comments="",
@@ -118,8 +136,10 @@ def main():
     fig, ax = plt.subplots(figsize=(10, 4.5))
     ax.plot(history_minutes, history_ns - np.polyval(trend, history_minutes),
             color="#596773", label="Observed history")
-    for (name, values), color in zip(forecasts.items(), ["#2463a6", "#d76a13", "#168568"]):
-        ax.plot(minutes, values - future_trend, color=color, linewidth=2,
+    colors = {"timesfm": "#2463a6", "linear": "#2463a6", "finetuned": "#a43486",
+              "polynomial": "#d76a13", "periodic": "#168568"}
+    for name, values in forecasts.items():
+        ax.plot(minutes, values - future_trend, color=colors[name], linewidth=2,
                 label=f"{labels[name]} (RMSE {rmses[name]:.3f} ns)")
     ax.plot(minutes, truth_ns - future_trend, ":", color="black", label="Future observations")
     ax.axvspan(0, minutes[-1], color="#f1b75c", alpha=0.18)
