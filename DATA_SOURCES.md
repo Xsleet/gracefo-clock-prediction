@@ -2,7 +2,7 @@
 
 教学代码采用仓库根目录的 MIT 许可证。该许可证不替代数据提供方或外部模型的条款。
 
-示例数据来自 NASA/JPL 的 GRACE-FO Level-1B RL04 CLK1B 日产品：原展示数据为卫星 C、D 的 2025-06-01 至 2025-06-03；新增微调数据为 C 星的 2025-05-27 至 2025-05-31。原始文件含跨日重叠段。项目使用其 `eps_time`，没有使用轨道数据。
+示例数据来自 NASA/JPL 的 GRACE-FO Level-1B RL04 CLK1B 日产品，卫星 C、D，名义日期为 2025-06-01 至 2025-06-03。原始文件含跨日重叠段。项目使用其 `eps_time`，没有使用轨道数据。
 
 - 原始文件头产品标识：[10.5067/GFJPL-L1B04](https://doi.org/10.5067/GFJPL-L1B04)。
 - PO.DAAC ASCII 集合：[GRACEFO_L1B_ASCII_GRAV_JPL_RL04](https://podaac.jpl.nasa.gov/dataset/GRACEFO_L1B_ASCII_GRAV_JPL_RL04)，集合 DOI：[10.5067/GFL1B-ASJ04](https://doi.org/10.5067/GFL1B-ASJ04)。两个 DOI 的标识层次不同，均按来源记录。
@@ -14,8 +14,4 @@
 
 TimesFM 通过独立依赖安装，仓库不分发其源码或权重。其[源码](https://github.com/google-research/timesfm)使用 Apache-2.0；3.0 [权重许可证](https://huggingface.co/google/timesfm-3.0-pytorch/blob/main/LICENSE)限制下载权重的商业和生产用途。本项目的可选路径用于课堂和本地研究。CPU 多项式基线不依赖 TimesFM。
 
-该权重许可证的 Restrictions 还明确禁止分发模型或其衍生物，因此**仓库不上传原始权重或微调预测头**，不创建权重下载链接。`finetune.py` 在学生本机进行非商业教学训练，生成的 `head.pt` 留在被 Git 忽略的输出目录；项目 MIT 许可不覆盖该权重。训练代码调用固定版本的[官方 PyTorch decode 实现](https://github.com/google-research/timesfm/blob/e51928e27119cb17bebc005be2696b75e0a9e688/src/timesfm3/torch/model.py)，启用梯度后只更新 output_head；这不是官方发布的钟差专用微调模型。
-
-简明版 `data/clock.csv` 从上述 C 星子集中提取固定的第一个实验窗口，只保留时间与钟差两列，详情见 [说明](data/README.md)。
-
-`data/finetune.csv` 是五个 5 月日文件的两列教学子集，五份原始文件的 SHA-256、质量筛选和合并规则见 `data/finetune.manifest.json`；重建脚本为 `advanced/prepare_finetune_data.py`。
+简明版 `data/clock.csv` 从上述 C 星子集的全部记录提取时间与钟差两列，支持固定 8 个起报窗口；默认窗口 1 保留原演示时间，详情见 [说明](data/README.md)。

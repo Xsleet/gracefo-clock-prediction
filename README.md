@@ -1,13 +1,13 @@
 # GRACE-FO 钟差预报 · 简明版
 
-**看预测读 [main.py](main.py)，看微调读 [finetune.py](finetune.py)。**
+**只读 [main.py](main.py) 一个文件，就能看完实验。**
 
-用 C 星**过去 6 小时的钟差，预测未来 60 分钟**，比较 **原始 TimesFM、微调 TimesFM、二次多项式、二次多项式 + 周期项**。训练和展示数据均已附带。
+用 C 星**过去 6 小时的钟差，预测未来 60 分钟**，比较 **原始 TimesFM、二次多项式、二次多项式 + 周期项**。三天数据已附带，支持切换 **8 个固定窗口**。
 
-原始模型为 Google 官方预训练 **TimesFM 3.0**（`google/timesfm-3.0-pytorch`），未作钟差微调。微调版本**只更新最后的预测头**（737,856 个参数），其余权重冻结；这是轻量微调，没有使用 LoRA 或全参数训练。两者均保留官方默认内部去趋势设置。
+默认使用 Google 官方预训练 **TimesFM 3.0**（`google/timesfm-3.0-pytorch`），没有在钟差数据上微调，也没有加载 LoRA；本例是零样本预测。模型自身的内部去趋势保留官方默认设置。
 
 ```text
-先用 5 月数据微调 → 用 6 月的过去 6 小时预测 → 四种模型画在同一张图上
+读数据 → 取历史 → 三种模型预测 → 与真实值比较 → 看同一张去趋势图
 ```
 
 ## 1. 准备
@@ -29,8 +29,7 @@ python -m venv .venv
 ```bash
 python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -r requirements-timesfm.txt
-python finetune.py --device cpu
-python main.py --device cpu --finetuned
+python main.py --device cpu
 ```
 
 **有 NVIDIA 显卡：GPU**（需要支持 CUDA 12.8 的驱动）
@@ -38,36 +37,22 @@ python main.py --device cpu --finetuned
 ```bash
 python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
 python -m pip install -r requirements-timesfm.txt
-python finetune.py --device gpu
-python main.py --device gpu --finetuned
+python main.py --device gpu
 ```
 
-选择一种设备运行即可。首次下载约 **1.32 GB** 原始权重；然后微调 100 步，保存到 `outputs/finetune/head.pt`。之后只运行 `main.py` 的命令即可复用，CPU/GPU 都支持。两种设备使用相同数据和训练设置，数值可能有细小差异。macOS 的 CPU 路径把第一条安装命令换为 `python -m pip install torch==2.8.0`。
-
-微调的三个步骤：**用训练数据更新预测头 → 用验证数据选最佳训练步 → 加载该预测头作四模型比较**。学习率固定为 `1e-5`，每批 4 个窗口，随机种子 2026，每 20 步验证一次。
-
-| 数据 | 用途 |
-|---|---|
-| 5 月 27–30 日，63 个窗口 | 训练预测头 |
-| 5 月 31 日，9 个窗口 | 选择最佳训练步 |
-| 6 月 2 日 00:00 起报 | 保留原展示窗口，评价未来 60 分钟 |
-
-训练、验证、展示的实际观测时间互不重叠；训练窗口之间允许重叠。微调代码不读取展示文件 `data/clock.csv`。这段展示数据此前已看过，因此是教学回顾实验，不是新盲测。
-
-权重许可禁止再分发微调权重，故仓库提供数据和代码，权重由学生在本机生成，详见 [来源与许可](DATA_SOURCES.md)。只想运行之前的三模型版本，可去掉 `--finetuned`，无需训练。
+CPU、GPU 使用**相同数据、相同模型**，只是运行设备不同；数值可能有细小差异。首次运行自动下载约 **1.32 GB** 模型，需要联网，无需训练。macOS 的 CPU 路径把第一条安装命令换为 `python -m pip install torch==2.8.0`。
 
 ## 3. 看结果
 
-打开 `outputs/comparison-cpu/result.png`（GPU 对应 `comparison-gpu`）：
+默认运行窗口 1。打开 `outputs/timesfm-cpu/window-01/result.png`（GPU 对应 `timesfm-gpu`）：
 
-**一张去趋势后的图：过去 6 小时观测 → 起报虚线 → 未来 60 分钟预测。** 灰线是历史，蓝线为原始 TimesFM，紫线为微调 TimesFM，橙线为多项式，绿线为多项式 + 周期项。黑色点线是未来真实值，仅用于比较；浅黄色区域为预测窗口。
+**一张去趋势后的图：过去 6 小时观测 → 起报虚线 → 未来 60 分钟预测。** 灰线是历史，蓝线为 TimesFM，橙线为多项式，绿线为多项式 + 周期项。黑色点线是未来真实值，仅用于比较；浅黄色区域为预测窗口。
 
-四种模型在预测时使用**同一段 6 小时历史**；微调模型额外使用了 5 月样本事先训练：
+三种模型使用**同一段 6 小时历史**：
 
 | 模型 | 学生需要理解的内容 |
 |---|---|
-| 原始 TimesFM | 直接加载官方预训练模型，无需训练 |
-| 微调 TimesFM | 保留主体，只训练最后负责输出预测值的一层 |
+| TimesFM | 直接加载官方预训练模型，无需训练 |
 | 二次多项式 | 用最小二乘拟合 `a + b*t + c*t²`，向未来延伸 |
 | 二次多项式 + 周期项 | 在多项式上加 `A*sin(2πt/T) + B*cos(2πt/T)`，描述重复波动 |
 
@@ -75,20 +60,19 @@ python main.py --device gpu --finetuned
 
 趋势是**仅用历史数据拟合的直线**。绘图时，历史、未来真值和预测统一减去这条直线及其外推值，单位为 ns。这样能看清细小变化；这一步只影响显示，不改变模型输入、预测值或 RMSE，也不是模型微调。
 
-![去趋势后的历史观测与四种模型预报](data/example.png)
+![去趋势后的历史观测与三种模型预报](data/example.png)
 
 本机实测的未来 60 分钟 RMSE（ns，越小越好）：
 
 | 模型 | CPU | GPU |
 |---|---:|---:|
 | TimesFM（未微调） | 1.4563 | 1.4875 |
-| TimesFM（预测头微调） | 1.3432 | 1.3733 |
 | 二次多项式 | 2.6856 | 2.6856 |
 | 二次多项式 + 周期项 | **0.9666** | **0.9666** |
 
-两列分别在对应设备上完成训练和预测，图中展示 GPU 结果。微调使 TimesFM 的本窗口 RMSE 降低约 **7.7%**，但仍高于多项式 + 周期项。100 步预测头微调是入门实验，不代表 TimesFM 充分微调后的最佳能力。两个小型最小二乘对照均由 NumPy 在 CPU 上计算。
+图中展示 GPU 结果。本窗口中，多项式 + 周期项误差最小；这不意味着它在所有日期都最好。CPU/GPU 选项控制 TimesFM 的推理设备，两个小型最小二乘对照均由 NumPy 在 CPU 上计算。
 
-同目录的 `prediction.csv` 有十列：时间、真实钟差，以及四种模型各自的“预测钟差（秒）、误差（ns）”。前缀分别为 `timesfm`、`finetuned`、`polynomial`、`periodic`。终端和图例显示各模型 RMSE；再次运行会更新结果文件。训练过程和检查结果保存在 `outputs/finetune/training.json`。
+同目录的 `prediction.csv` 有八列：时间、真实钟差，以及三种模型各自的“预测钟差（秒）、误差（ns）”。列名带 `timesfm`、`polynomial`、`periodic` 前缀。终端和图例显示各模型 RMSE；再次运行会更新结果文件。
 
 读代码时只跟着六个中文注释走：选设备、读数据、换单位、预测、算误差、画图。`truth` 是未来真实值，**只用于最后评分，不能输入模型**。
 
@@ -99,6 +83,34 @@ python -m pip install -r requirements.txt
 python main.py --model linear
 ```
 
-这个快速示例运行线性外推和两个多项式对照，共三条预测曲线；CSV 有八列，首个模型前缀为 `linear`。跑通后再尝试上面的四模型比较。
+这个快速示例把 TimesFM 换成最近 10 分钟的线性外推，同时保留两个多项式对照，全部运行在 CPU。其 CSV 中首个模型前缀为 `linear`。跑通后，再运行上面的 CPU/GPU TimesFM 命令，即可得到三种目标模型的比较图。
 
-本例是一个固定窗口的入门实验，不代表全年精度。数据使用说明见 [data/README.md](data/README.md)；模型权重限教学研究等许可用途，见 [来源与许可](DATA_SOURCES.md)。完整多窗口实验放在 [advanced/](advanced/README.md)，入门时可以先不看。
+## 4. 换个窗口试试
+
+**原窗口不是整体结论。** 固定检查 6 月 2–3 日每隔 6 小时的全部 8 个起报窗口，三种模型及参数保持不变，所有窗口都满足连续性要求，未按误差筛选。
+
+```bash
+# 单独查看下一个窗口：6 月 2 日 06:00
+python main.py --device cpu --window 2
+
+# 跑完全部 8 个窗口，并汇总比较
+python compare_windows.py --device cpu
+```
+
+用 GPU 时把 `cpu` 换成 `gpu`。编号 1–4 对应 6 月 2 日的 00、06、12、18 时，5–8 对应 6 月 3 日相同小时，均为接收机时间。每个窗口的图和 CSV 分别保存到 `outputs/timesfm-cpu/window-01` 至 `window-08`。
+
+下一个窗口的 GPU RMSE 为：TimesFM **1.4404**、多项式 **10.2971**、多项式 + 周期项 **10.1391 ns**。从[该窗口的去趋势图](data/next-window.png)可见，真实值在起报后回升，两个传统模型却继续向下外推。完整 8 窗口结果如下：
+
+| 模型 | CPU 总体 RMSE/ns | GPU 总体 RMSE/ns | 最优窗口数（两设备一致） |
+|---|---:|---:|---:|
+| 原始 TimesFM | **1.2394** | **1.2929** | **7/8** |
+| 二次多项式 | 6.5299 | 6.5299 | 0/8 |
+| 二次多项式 + 周期项 | 6.6145 | 6.6145 | 1/8 |
+
+总体 RMSE 将 8 个窗口的全部 2880 个未来点一起计算，**不是各窗口 RMSE 的算术平均**。汇总图和表保存在 `outputs/windows-cpu/`（GPU 为 `windows-gpu`）；已运行的 [逐窗口表](advanced/reference/windows/by_window-gpu.csv)也附在仓库中。
+
+![全部八个固定窗口的三模型比较](data/window-comparison.png)
+
+这说明**结果确实对窗口敏感，单个例子不足以判断模型优劣**：周期模型在原窗口较好，而原始 TimesFM 在这 8 个固定窗口上总体更好。这里仍只有两个起报日期，不能代表全年精度。
+
+数据使用说明见 [data/README.md](data/README.md)；模型权重限教学研究等许可用途，见 [来源与许可](DATA_SOURCES.md)。早期包含更多基线的实验保存在 [advanced/](advanced/README.md)，其统计口径与本次三模型比较分开。

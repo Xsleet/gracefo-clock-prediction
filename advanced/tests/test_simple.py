@@ -15,15 +15,15 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 import main as simple
+from compare_windows import summarize
 
 
 class SimpleExampleTests(unittest.TestCase):
     def test_teaching_window_matches_source(self):
         sample = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
         rows = [line.split() for line in (ROOT / "data/sample/CLK1B_2025-06-01_to_2025-06-03_C.txt").read_text().splitlines()]
-        source = np.array([[float(row[2]), float(row[5])] for row in rows
-                           if sample[0, 0] <= int(row[2]) <= sample[-1, 0]])
-        self.assertEqual(sample.shape, (2520, 2))
+        source = np.array([[float(row[2]), float(row[5])] for row in rows])
+        self.assertEqual(sample.shape, (25981, 2))
         np.testing.assert_array_equal(sample, source)
         self.assertTrue(np.all(np.diff(sample[:, 0]) == 10))
 
@@ -33,8 +33,8 @@ class SimpleExampleTests(unittest.TestCase):
         run = subprocess.run([sys.executable, str(ROOT / "main.py"), "--model", "linear"],
                              check=True, capture_output=True, env=env)
         self.assertIn("历史", run.stdout.decode("utf-8"))
-        result = np.loadtxt(ROOT / "outputs/linear-cpu/prediction.csv", delimiter=",", skiprows=1)
-        sample = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
+        result = np.loadtxt(ROOT / "outputs/linear-cpu/window-01/prediction.csv", delimiter=",", skiprows=1)
+        sample = simple.select_window(np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1), 1)
         self.assertEqual(result.shape, (360, 8))
         self.assertEqual(result[0, 0], sample[2159, 0] + 10)
         np.testing.assert_array_equal(result[:, :2], sample[2160:])
@@ -68,7 +68,8 @@ class SimpleExampleTests(unittest.TestCase):
     def test_future_observations_do_not_change_any_baseline_prediction(self):
         sample = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
         changed = sample.copy()
-        changed[2160:, 1] += 30e-9
+        origin = simple.select_window(sample, 1)[2159, 0]
+        changed[changed[:, 0] > origin, 1] += 30e-9
         results = []
         with tempfile.TemporaryDirectory() as directory:
             for data in (sample, changed):
@@ -77,11 +78,38 @@ class SimpleExampleTests(unittest.TestCase):
                         patch.object(sys, "argv", ["main.py", "--model", "linear"]), \
                         redirect_stdout(io.StringIO()):
                     simple.main()
-                results.append(np.loadtxt(Path(directory) / "outputs/linear-cpu/prediction.csv",
+                results.append(np.loadtxt(Path(directory) / "outputs/linear-cpu/window-01/prediction.csv",
                                           delimiter=",", skiprows=1))
         np.testing.assert_array_equal(results[0][:, [2, 4, 6]], results[1][:, [2, 4, 6]])
         np.testing.assert_allclose(results[1][:, [3, 5, 7]] - results[0][:, [3, 5, 7]],
                                    -30, atol=1e-5)
+
+    def test_all_eight_origins_follow_fixed_schedule(self):
+        data = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
+        first_origin = (simple.datetime(2025, 6, 2) - simple.EPOCH).total_seconds()
+        for number in range(1, 9):
+            window = simple.select_window(data, number)
+            origin = first_origin + (number - 1) * 6 * 3600
+            self.assertEqual(window.shape, (2520, 2))
+            self.assertEqual(window[0, 0], origin - 6 * 3600 + 10)
+            self.assertEqual(window[2159, 0], origin)
+            self.assertEqual(window[2160, 0], origin + 10)
+            self.assertEqual(window[-1, 0], origin + 3600)
+
+    def test_selected_window_rejects_missing_epoch_and_invalid_number(self):
+        data = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
+        origin = simple.select_window(data, 2)[2159, 0]
+        with self.assertRaises(ValueError):
+            simple.select_window(data[data[:, 0] != origin], 2)
+        with self.assertRaises(ValueError):
+            simple.select_window(data, 9)
+
+    def test_pooled_rmse_is_not_arithmetic_mean_of_window_rmses(self):
+        summary = summarize(np.array([[1., 3., 4.], [3., 1., 2.]]))
+        self.assertAlmostEqual(summary[0]["pooled_rmse_ns"], np.sqrt(5))
+        self.assertEqual(summary[0]["median_window_rmse_ns"], 2)
+        self.assertEqual([row["wins"] for row in summary], [1, 1, 0])
+        self.assertEqual(summary[0]["points"], 720)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,45 @@
+{
+  "satellite": "C",
+  "history_points": 2160,
+  "forecast_points": 360,
+  "step_seconds": 10,
+  "time_system": "receiver time, not UTC",
+  "origins": [
+    "2025-06-02 00:00:00",
+    "2025-06-02 06:00:00",
+    "2025-06-02 12:00:00",
+    "2025-06-02 18:00:00",
+    "2025-06-03 00:00:00",
+    "2025-06-03 06:00:00",
+    "2025-06-03 12:00:00",
+    "2025-06-03 18:00:00"
+  ],
+  "selection": "Original fixed June 2-3 schedule at 00/06/12/18; all 8 accepted; no error-based filtering",
+  "model": "google/timesfm-3.0-pytorch",
+  "revision": "43046b85ec22d584a13f8098c2ed39c889e129c2",
+  "fine_tuning": false,
+  "quantile_sorting": true,
+  "make_positive": false,
+  "symmetric_averaging": false,
+  "polynomial_degree": 2,
+  "period_search_minutes": [
+    60,
+    150,
+    1
+  ],
+  "selected_period_minutes": [
+    93,
+    98,
+    94,
+    96,
+    94,
+    90,
+    94,
+    98
+  ],
+  "data_sha256": "aa2363cda354760d5c2ac4a048a010a87eead828a11ba06660a7a0b45b6b4d4d",
+  "aggregation": "RMSE over all 2880 future errors; per-window files store absolute seconds and errors in ns",
+  "cpu_torch": "2.8.0+cpu",
+  "gpu_torch": "2.8.0.dev20250408+cu128",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti"
+}
