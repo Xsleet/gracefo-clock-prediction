@@ -1,4 +1,4 @@
-"""读 main.py 即可：读钟差 -> 用历史预测未来 -> 画误差图。"""
+"""读 main.py 即可：读钟差 -> 用历史预测未来 -> 画去趋势后的预报图。"""
 import argparse
 import sys
 from pathlib import Path
@@ -78,32 +78,28 @@ def main():
         comments="", fmt=["%.0f", "%.17g", "%.17g", "%.10g"])
     minutes = np.arange(1, PREDICT_POINTS + 1) * 10 / 60
     history_minutes = np.arange(1 - HISTORY_POINTS, 1) * 10 / 60
-    fig, (overview, errors) = plt.subplots(2, 1, figsize=(10, 7))
-    # 上图展示完整历史与未来；0 分钟是最后一个已知观测，预测从 +10 秒开始。
-    overview.plot(history_minutes, history * 1e3, color="#596773", label="Observed history")
-    overview.plot(minutes, (last + prediction * 1e-9) * 1e3, color="#2463a6", linewidth=2.5,
-                  label="TimesFM forecast" if args.model == "timesfm" else "Linear forecast")
-    overview.plot(minutes, truth * 1e3, ":", color="black", label="Future observations (comparison only)")
-    overview.axvspan(0, minutes[-1], color="#f1b75c", alpha=0.18)
-    overview.axvline(0, color="black", linestyle="--", linewidth=1)
-    overview.text(history_minutes[0] / 2, 0.92, f"History: {HISTORY_POINTS * 10 / 3600:g} h",
-                  transform=overview.get_xaxis_transform(), ha="center")
-    overview.text(minutes[-1] / 2, 0.87, f"Forecast\n{minutes[-1]:g} min",
-                  transform=overview.get_xaxis_transform(), ha="center", fontsize=9)
-    overview.set(xlim=(-HISTORY_POINTS * 10 / 60, minutes[-1]), ylabel="Clock offset (ms)",
-                 xlabel="Minutes relative to forecast start (0)", title=f"GRACE-FO C | {args.device.upper()}")
-    overview.set_xticks(np.r_[np.arange(-HISTORY_POINTS * 10 / 60, 0, 60), 0, minutes[-1]])
-    overview.legend(loc="lower left", fontsize=8)
-    # 下图放大未来误差：上图两条曲线几乎重合时，也能判断预报好坏。
-    errors.plot(minutes, linear_error, "--", color="gray", label="Linear baseline")
-    if args.model == "timesfm":
-        errors.plot(minutes, error, color="#2463a6", label=f"TimesFM | RMSE {rmse:.3f} ns")
-    errors.axhline(0, color="black", linewidth=0.8)
-    errors.set(xlim=(0, minutes[-1]), xlabel="Minutes ahead", ylabel="Prediction - observation (ns)",
-               title="Forecast error | closer to zero is better")
-    errors.legend()
-    for ax in (overview, errors):
-        ax.grid(alpha=0.2)
+    # 只为绘图：用过去 6 小时拟合直线，历史、真值、预测都减去同一条线。
+    # 趋势不使用未来数据；不改变上面的模型输入、预测结果和 CSV。
+    trend = np.polyfit(history_minutes, history_ns, 1)
+    future_trend = np.polyval(trend, minutes)
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    ax.plot(history_minutes, history_ns - np.polyval(trend, history_minutes),
+            color="#596773", label="Observed history")
+    ax.plot(minutes, prediction - future_trend, color="#2463a6", linewidth=2,
+            label="TimesFM forecast" if args.model == "timesfm" else "Linear forecast")
+    ax.plot(minutes, truth_ns - future_trend, ":", color="black", label="Future observations")
+    ax.axvspan(0, minutes[-1], color="#f1b75c", alpha=0.18)
+    ax.axvline(0, color="black", linestyle="--", linewidth=1)
+    ax.text(history_minutes[0] / 2, 0.82, f"History: {HISTORY_POINTS * 10 / 3600:g} h",
+            transform=ax.get_xaxis_transform(), ha="center")
+    ax.text(minutes[-1] / 2, 0.08, f"Forecast\n{minutes[-1]:g} min",
+            transform=ax.get_xaxis_transform(), ha="center", fontsize=9)
+    ax.set(xlim=(-HISTORY_POINTS * 10 / 60, minutes[-1]), ylabel="Detrended clock offset (ns)",
+           xlabel="Minutes relative to forecast start (0)",
+           title=f"GRACE-FO C | linear trend fitted on history only | {args.device.upper()}")
+    ax.set_xticks(np.r_[np.arange(-HISTORY_POINTS * 10 / 60, 0, 60), 0, minutes[-1]])
+    ax.legend(loc="upper left", ncol=3, fontsize=8)
+    ax.grid(alpha=0.2)
     fig.tight_layout()
     fig.savefig(output / "result.png", dpi=150)
     plt.close(fig)
