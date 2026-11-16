@@ -16,4 +16,4 @@
 
 文件取自 `sample/CLK1B_2025-06-01_to_2025-06-03_C.txt` 的第 3 列（历元秒数）和第 6 列（eps_time），不改变其数值。此窗口没有缺测、非零质量标记或 clock_id 变化。
 
-`sample/` 保存原来的三天 C/D 数据和六份原始日文件的哈希清单；详细合并规则见 [完整数据说明](../advanced/docs/data.md)，原始来源与引用见 [DATA_SOURCES.md](../DATA_SOURCES.md)。`example.png` 为 GPU 实际运行的单图：历史、未来真值与预测统一减去仅由历史拟合的线性趋势，展示过去 6 h 至未来 60 min 的变化；原始钟差和输出 CSV 不做这个绘图变换。
+`sample/` 保存原来的三天 C/D 数据和六份原始日文件的哈希清单；详细合并规则见 [完整数据说明](../advanced/docs/data.md)，原始来源与引用见 [DATA_SOURCES.md](../DATA_SOURCES.md)。`example.png` 为 GPU 实际运行的三模型对比图：TimesFM、二次多项式、二次多项式 + 周期项。历史、未来真值与所有预测统一减去仅由历史拟合的线性趋势，展示过去 6 h 至未来 60 min 的变化；原始钟差和输出 CSV 不做这个绘图变换。

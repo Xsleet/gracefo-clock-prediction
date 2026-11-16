@@ -14,6 +14,29 @@ PREDICT_POINTS = 360
 ROOT = Path(__file__).resolve().parent
 
 
+def polynomial_forecasts(history_ns, horizon):
+    """两个对照都只看历史：二次多项式，以及二次多项式 + 一组正弦/余弦。"""
+    t = np.arange(1 - len(history_ns), 1) / 360  # 小时，起报点为 0
+    future = np.arange(1, horizon + 1) / 360
+    polynomial = np.polyval(np.polyfit(t, history_ns, 2), future)
+
+    def features(hours, period_minutes):
+        phase = 2 * np.pi * hours / (period_minutes / 60)
+        return np.column_stack([np.ones_like(hours), hours, hours**2,
+                                np.sin(phase), np.cos(phase)])
+
+    # 预先固定搜索范围和步长；按历史拟合误差选周期，不查看未来真值。
+    best_mse = np.inf
+    for period in range(60, 151):  # 60–150 分钟，每次增加 1 分钟
+        design = features(t, period)
+        coefficients = np.linalg.lstsq(design, history_ns, rcond=None)[0]
+        mse = np.mean((design @ coefficients - history_ns)**2)
+        if mse < best_mse:
+            best_mse, best_period = mse, period
+            periodic = features(future, period) @ coefficients
+    return polynomial, periodic, best_period
+
+
 def main():
     # 1. 选择 CPU 或 GPU；两者运行相同的模型。
     parser = argparse.ArgumentParser(description=__doc__)
@@ -41,7 +64,9 @@ def main():
     history_ns = (history - last) * 1e9
     print(f"历史 {len(history)} 点 -> 预报 {PREDICT_POINTS} 点，设备：{args.device}")
 
-    # 4. 简单对照：用最近 10 分钟拟合斜率，从最后观测值向后延伸。
+    # 4. 三种模型都只读取历史；多项式对照也使用完整的 6 小时。
+    polynomial, periodic, period = polynomial_forecasts(history_ns, PREDICT_POINTS)
+    # 保留 --model linear 快速示例：最近 10 分钟的斜率，从最后观测值延伸。
     slope, _ = np.polyfit(np.arange(-59, 1), history_ns[-60:], 1)
     linear = slope * np.arange(1, PREDICT_POINTS + 1)
     prediction = linear
@@ -59,23 +84,31 @@ def main():
                 [history_ns.astype(np.float32)], horizon=PREDICT_POINTS,
                 return_quantiles=False, make_positive=False, use_symmetric_averaging=False))
         prediction = result[0].forecast.astype(np.float64)
-    if prediction.shape != (PREDICT_POINTS,) or not np.isfinite(prediction).all():
-        raise ValueError("模型没有返回完整、有效的预报。")
+    forecasts = {args.model: prediction, "polynomial": polynomial, "periodic": periodic}
 
     # 5. 预测完成后才与真实值比较。RMSE 越小，预报越准。
     truth_ns = (truth - last) * 1e9
-    error = prediction - truth_ns
-    linear_error = linear - truth_ns
-    rmse = np.sqrt(np.mean(error**2))
-    print(f"{args.model} RMSE = {rmse:.4f} ns；线性对照 = {np.sqrt(np.mean(linear_error**2)):.4f} ns")
+    labels = {"timesfm": "TimesFM", "linear": "Linear (10 min)",
+              "polynomial": "Polynomial (degree 2)", "periodic": "Polynomial + periodic"}
+    columns = [sample[HISTORY_POINTS:, 0], truth]
+    header = ["receiver_seconds", "true_seconds"]
+    rmses = {}
+    print(f"历史拟合选出的周期：{period} 分钟")
+    for name, values in forecasts.items():
+        if values.shape != (PREDICT_POINTS,) or not np.isfinite(values).all():
+            raise ValueError(f"{name} 没有返回完整、有效的预报。")
+        error = values - truth_ns
+        rmses[name] = np.sqrt(np.mean(error**2))
+        print(f"{labels[name]} RMSE = {rmses[name]:.4f} ns")
+        columns.extend([last + values * 1e-9, error])
+        header.extend([f"{name}_seconds", f"{name}_error_ns"])
 
     # 6. 只输出一个 CSV 和一张图。再次运行会更新同一目录。
     output = ROOT / "outputs" / f"{args.model}-{args.device}"
     output.mkdir(parents=True, exist_ok=True)
-    np.savetxt(output / "prediction.csv", np.column_stack([
-        sample[HISTORY_POINTS:, 0], truth, last + prediction * 1e-9, error]),
-        delimiter=",", header="receiver_seconds,true_seconds,predicted_seconds,error_ns",
-        comments="", fmt=["%.0f", "%.17g", "%.17g", "%.10g"])
+    np.savetxt(output / "prediction.csv", np.column_stack(columns),
+        delimiter=",", header=",".join(header), comments="",
+        fmt=["%.0f", "%.17g"] + ["%.17g", "%.10g"] * len(forecasts))
     minutes = np.arange(1, PREDICT_POINTS + 1) * 10 / 60
     history_minutes = np.arange(1 - HISTORY_POINTS, 1) * 10 / 60
     # 只为绘图：用过去 6 小时拟合直线，历史、真值、预测都减去同一条线。
@@ -85,12 +118,13 @@ def main():
     fig, ax = plt.subplots(figsize=(10, 4.5))
     ax.plot(history_minutes, history_ns - np.polyval(trend, history_minutes),
             color="#596773", label="Observed history")
-    ax.plot(minutes, prediction - future_trend, color="#2463a6", linewidth=2,
-            label="TimesFM forecast" if args.model == "timesfm" else "Linear forecast")
+    for (name, values), color in zip(forecasts.items(), ["#2463a6", "#d76a13", "#168568"]):
+        ax.plot(minutes, values - future_trend, color=color, linewidth=2,
+                label=f"{labels[name]} (RMSE {rmses[name]:.3f} ns)")
     ax.plot(minutes, truth_ns - future_trend, ":", color="black", label="Future observations")
     ax.axvspan(0, minutes[-1], color="#f1b75c", alpha=0.18)
     ax.axvline(0, color="black", linestyle="--", linewidth=1)
-    ax.text(history_minutes[0] / 2, 0.82, f"History: {HISTORY_POINTS * 10 / 3600:g} h",
+    ax.text(history_minutes[0] / 2, 0.78, f"History: {HISTORY_POINTS * 10 / 3600:g} h",
             transform=ax.get_xaxis_transform(), ha="center")
     ax.text(minutes[-1] / 2, 0.08, f"Forecast\n{minutes[-1]:g} min",
             transform=ax.get_xaxis_transform(), ha="center", fontsize=9)
