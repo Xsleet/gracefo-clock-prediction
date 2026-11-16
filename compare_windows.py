@@ -1,4 +1,4 @@
-"""依次运行预先固定的 8 个窗口，比较三模型，避免只看某一个例子。"""
+"""低轨卫星精密钟差预报Demo：依次运行 GRACE-FO 的 8 个固定窗口，比较三模型。"""
 import argparse
 import csv
 from datetime import timedelta

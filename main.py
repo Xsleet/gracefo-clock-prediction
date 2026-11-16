@@ -1,4 +1,4 @@
-"""读 main.py 即可：读钟差 -> 用历史预测未来 -> 画去趋势后的预报图。"""
+"""低轨卫星精密钟差预报Demo：以 GRACE-FO 为例，读钟差 -> 用历史预测未来 -> 画去趋势后的预报图。"""
 import argparse
 from datetime import datetime, timedelta
 import sys
