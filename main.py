@@ -77,19 +77,36 @@ def main():
         delimiter=",", header="receiver_seconds,true_seconds,predicted_seconds,error_ns",
         comments="", fmt=["%.0f", "%.17g", "%.17g", "%.10g"])
     minutes = np.arange(1, PREDICT_POINTS + 1) * 10 / 60
-    plt.figure(figsize=(8, 4))
-    plt.plot(minutes, linear_error, "--", color="gray", label="Linear baseline")
+    history_minutes = np.arange(1 - HISTORY_POINTS, 1) * 10 / 60
+    fig, (overview, errors) = plt.subplots(2, 1, figsize=(10, 7))
+    # 上图展示完整历史与未来；0 分钟是最后一个已知观测，预测从 +10 秒开始。
+    overview.plot(history_minutes, history * 1e3, color="#596773", label="Observed history")
+    overview.plot(minutes, (last + prediction * 1e-9) * 1e3, color="#2463a6", linewidth=2.5,
+                  label="TimesFM forecast" if args.model == "timesfm" else "Linear forecast")
+    overview.plot(minutes, truth * 1e3, ":", color="black", label="Future observations (comparison only)")
+    overview.axvspan(0, minutes[-1], color="#f1b75c", alpha=0.18)
+    overview.axvline(0, color="black", linestyle="--", linewidth=1)
+    overview.text(history_minutes[0] / 2, 0.92, f"History: {HISTORY_POINTS * 10 / 3600:g} h",
+                  transform=overview.get_xaxis_transform(), ha="center")
+    overview.text(minutes[-1] / 2, 0.87, f"Forecast\n{minutes[-1]:g} min",
+                  transform=overview.get_xaxis_transform(), ha="center", fontsize=9)
+    overview.set(xlim=(-HISTORY_POINTS * 10 / 60, minutes[-1]), ylabel="Clock offset (ms)",
+                 xlabel="Minutes relative to forecast start (0)", title=f"GRACE-FO C | {args.device.upper()}")
+    overview.set_xticks(np.r_[np.arange(-HISTORY_POINTS * 10 / 60, 0, 60), 0, minutes[-1]])
+    overview.legend(loc="lower left", fontsize=8)
+    # 下图放大未来误差：上图两条曲线几乎重合时，也能判断预报好坏。
+    errors.plot(minutes, linear_error, "--", color="gray", label="Linear baseline")
     if args.model == "timesfm":
-        plt.plot(minutes, error, color="#2463a6", label=f"TimesFM | RMSE {rmse:.3f} ns")
-    plt.axhline(0, color="black", linewidth=0.8)
-    plt.xlabel("Minutes ahead")
-    plt.ylabel("Prediction - observation (ns)")
-    plt.title(f"GRACE-FO C | {args.device.upper()} | closer to zero is better")
-    plt.legend()
-    plt.grid(alpha=0.2)
-    plt.tight_layout()
-    plt.savefig(output / "result.png", dpi=150)
-    plt.close()
+        errors.plot(minutes, error, color="#2463a6", label=f"TimesFM | RMSE {rmse:.3f} ns")
+    errors.axhline(0, color="black", linewidth=0.8)
+    errors.set(xlim=(0, minutes[-1]), xlabel="Minutes ahead", ylabel="Prediction - observation (ns)",
+               title="Forecast error | closer to zero is better")
+    errors.legend()
+    for ax in (overview, errors):
+        ax.grid(alpha=0.2)
+    fig.tight_layout()
+    fig.savefig(output / "result.png", dpi=150)
+    plt.close(fig)
     print(f"结果：{output / 'result.png'}")
 
 
