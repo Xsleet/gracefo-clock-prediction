@@ -6,6 +6,7 @@
 
 - 原始文件头产品标识：[10.5067/GFJPL-L1B04](https://doi.org/10.5067/GFJPL-L1B04)。
 - PO.DAAC ASCII 集合：[GRACEFO_L1B_ASCII_GRAV_JPL_RL04](https://podaac.jpl.nasa.gov/dataset/GRACEFO_L1B_ASCII_GRAV_JPL_RL04)，集合 DOI：[10.5067/GFL1B-ASJ04](https://doi.org/10.5067/GFL1B-ASJ04)。两个 DOI 的标识层次不同，均按来源记录。
+- [GFZ ISDC 的 GRACE-FO 官方档案](https://isdc.gfz.de/grace-fo-isdc/)也提供 JPL RL04 日产品。样本三天的原始日包链接见[官方下载说明](data/README.md#从官方档案下载原始数据)。
 - [官方用户手册](https://isdc-data.gfz.de/grace-fo/DOCUMENTS/Level-1/GRACE-FO_L1_Data_Product_User_Handbook_20190911.pdf)，CLK1B 字段和质量标记见 4.2.4。
 - 原始文件头声明的数据使用政策：[NASA Earth Science Data Policy](https://science.nasa.gov/earth-science/earth-science-data/data-information-policy)。
 - [PO.DAAC 引用指南](https://podaac.jpl.nasa.gov/CitingPODAAC)。使用数据时应致谢 NASA/JPL、GRACE-FO 科学数据系统及 NASA/GFZ 联合任务。

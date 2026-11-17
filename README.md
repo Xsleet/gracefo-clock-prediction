@@ -6,7 +6,7 @@
 
 默认使用 Google 官方预训练 **TimesFM 3.0**（`google/timesfm-3.0-pytorch`），没有在钟差数据上微调，也没有加载 LoRA；本例是零样本预测。模型自身的内部去趋势保留官方默认设置。
 
-[**下载 C 星钟差 CSV**](https://raw.githubusercontent.com/Xsleet/gracefo-clock-prediction/main/data/clock.csv) · [**数据字段、原始文件下载和自定义实验**](data/README.md)
+[**从 GRACE-FO 官方档案下载原始 CLK1B**](data/README.md#从官方档案下载原始数据) · [教学用 C 星 CSV](https://raw.githubusercontent.com/Xsleet/gracefo-clock-prediction/main/data/clock.csv)
 
 ```text
 读数据 → 取历史 → 三种模型预测 → 与真实值比较 → 看同一张去趋势图
