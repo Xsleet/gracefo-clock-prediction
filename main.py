@@ -16,12 +16,22 @@ ROOT = Path(__file__).resolve().parent
 EPOCH = datetime(2000, 1, 1, 12)
 
 
-def select_window(data, number):
-    """固定 8 个起报点：6 月 2–3 日，每隔 6 小时一个，不按误差选择。"""
-    if number not in range(1, 9) or not np.all(np.diff(data[:, 0]) > 0):
-        raise ValueError("窗口编号须为 1–8，数据时间须严格递增。")
-    origin = int((datetime(2025, 6, 2) - EPOCH).total_seconds()) + (number - 1) * 6 * 3600
-    expected = origin + np.arange(1 - HISTORY_POINTS, PREDICT_POINTS + 1) * 10
+def select_window(data, number, *, origin=None):
+    """按固定窗口编号或自定义接收机时间，提取完整的历史和评分区间。"""
+    if data.ndim != 2 or data.shape[1] != 2 or len(data) == 0:
+        raise ValueError("CSV 需要接收机时间、钟差两列以及数据行。")
+    if not np.all(np.isfinite(data[:, 0])) or not np.all(np.diff(data[:, 0]) > 0):
+        raise ValueError("数据时间须为有限值且严格递增。")
+    if origin is None:
+        if number not in range(1, 9):
+            raise ValueError("窗口编号须为 1–8。")
+        origin = datetime(2025, 6, 2) + timedelta(hours=6 * (number - 1))
+    if origin.tzinfo is not None:
+        raise ValueError("起报时刻使用接收机时间，请省略时区。")
+    seconds = (origin - EPOCH).total_seconds()
+    if seconds % 10:
+        raise ValueError("起报时刻须落在整 10 秒历元。")
+    expected = int(seconds) + np.arange(1 - HISTORY_POINTS, PREDICT_POINTS + 1) * 10
     start = np.searchsorted(data[:, 0], expected[0])
     sample = data[start:start + len(expected)]
     if not np.array_equal(sample[:, 0], expected) or not np.isfinite(sample).all():
@@ -58,18 +68,22 @@ def main():
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--model", choices=["timesfm", "linear"], default="timesfm")
     parser.add_argument("--checkpoint", default="google/timesfm-3.0-pytorch")
-    parser.add_argument("--window", type=int, choices=range(1, 9), default=1, help="起报窗口编号，默认 1")
+    epochs = parser.add_mutually_exclusive_group()
+    epochs.add_argument("--window", type=int, choices=range(1, 9), default=1, help="起报窗口编号，默认 1")
+    epochs.add_argument("--origin", type=datetime.fromisoformat, help="接收机时间，例如 2025-06-03T09:00:00")
+    parser.add_argument("--data", type=Path, help="自定义两列 CSV，默认 data/clock.csv")
+    parser.add_argument("--output", type=Path, help="自定义本次结果目录")
     args = parser.parse_args()
     if args.model == "linear" and args.device == "gpu":
         parser.error("线性示例使用 CPU；GPU 模式请用默认的 TimesFM。")
 
     # 2. 读两列数据：接收机时间（秒）、钟差（秒）。先划分，后处理。
-    data = np.loadtxt(ROOT / "data/clock.csv", delimiter=",", skiprows=1)
     if HISTORY_POINTS < 60 or PREDICT_POINTS < 1:
         parser.error("至少需要 60 个历史点和 1 个预测点。")
     try:
-        sample = select_window(data, args.window)
-    except ValueError as error:
+        data = np.loadtxt(args.data or ROOT / "data/clock.csv", delimiter=",", skiprows=1, ndmin=2)
+        sample = select_window(data, args.window, origin=args.origin)
+    except (OSError, ValueError) as error:
         parser.error(str(error))
     history = sample[:HISTORY_POINTS, 1]
     truth = sample[HISTORY_POINTS:, 1]  # 真值留到最后评价，不传给模型。
@@ -77,8 +91,9 @@ def main():
     # 3. 减去最后一个历史钟差，再从秒转为纳秒（ns），避免精度损失。
     last = history[-1]
     history_ns = (history - last) * 1e9
-    origin_label = (EPOCH + timedelta(seconds=int(sample[HISTORY_POINTS - 1, 0]))).strftime("%Y-%m-%d %H:%M")
-    print(f"窗口 {args.window}，起报 {origin_label}，历史 {len(history)} 点 -> 预报 {PREDICT_POINTS} 点，设备：{args.device}")
+    origin_time = EPOCH + timedelta(seconds=int(sample[HISTORY_POINTS - 1, 0]))
+    origin_label = origin_time.isoformat(sep=" ", timespec="seconds" if origin_time.second else "minutes")
+    print(f"起报 {origin_label}，历史 {len(history)} 点 -> 预报 {PREDICT_POINTS} 点，设备：{args.device}")
 
     # 4. 三种模型都只读取历史；多项式对照也使用完整的 6 小时。
     polynomial, periodic, period = polynomial_forecasts(history_ns, PREDICT_POINTS)
@@ -120,7 +135,10 @@ def main():
         header.extend([f"{name}_seconds", f"{name}_error_ns"])
 
     # 6. 只输出一个 CSV 和一张图。再次运行会更新同一目录。
-    output = ROOT / "outputs" / f"{args.model}-{args.device}" / f"window-{args.window:02d}"
+    run_name = f"window-{args.window:02d}" if args.origin is None else args.origin.strftime("%Y%m%d-%H%M%S")
+    if args.data is not None:
+        run_name = f"{args.data.stem}-{run_name}"
+    output = args.output or ROOT / "outputs" / f"{args.model}-{args.device}" / run_name
     output.mkdir(parents=True, exist_ok=True)
     np.savetxt(output / "prediction.csv", np.column_stack(columns),
         delimiter=",", header=",".join(header), comments="",
@@ -144,9 +162,10 @@ def main():
             transform=ax.get_xaxis_transform(), ha="center")
     ax.text(minutes[-1] / 2, 0.08, f"Forecast\n{minutes[-1]:g} min",
             transform=ax.get_xaxis_transform(), ha="center", fontsize=9)
+    dataset = args.data.stem if args.data else "GRACE-FO C"
     ax.set(xlim=(-HISTORY_POINTS * 10 / 60, minutes[-1]), ylabel="Detrended clock offset (ns)",
            xlabel="Minutes relative to forecast start (0)",
-           title=f"GRACE-FO C | {origin_label} (receiver time) | {args.device.upper()}")
+           title=f"{dataset} | {origin_label} (receiver time) | {args.device.upper()}")
     ax.set_xticks(np.r_[np.arange(-HISTORY_POINTS * 10 / 60, 0, 60), 0, minutes[-1]])
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20), ncol=3, fontsize=8)
     ax.grid(alpha=0.2)

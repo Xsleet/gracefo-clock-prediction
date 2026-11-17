@@ -10,7 +10,7 @@ import re
 EPOCH = datetime(2000, 1, 1, 12)
 
 
-def merge_native(paths, satellite):
+def merge_native(paths, satellite, *, csv_format=False):
     # 必须按文件名中的日期排序，避免绝对路径决定日界选择。
     paths = sorted(paths, key=lambda p: p.name)
     if not paths or len({p.name for p in paths}) != len(paths):
@@ -46,12 +46,16 @@ def merge_native(paths, satellite):
             selected[t] = row
     lines = []
     for t, row in sorted(selected.items()):
-        calendar = (EPOCH + timedelta(seconds=t)).isoformat(sep=" ")
-        lines.append(calendar + " " + " ".join(row))
+        if csv_format:
+            lines.append(f"{t},{row[3]}")
+        else:
+            calendar = (EPOCH + timedelta(seconds=t)).isoformat(sep=" ")
+            lines.append(calendar + " " + " ".join(row))
     stats["merged_records"] = len(lines)
     if not lines:
         raise ValueError("No CLK1B records found.")
-    return "\n".join(lines) + "\n", {
+    header = "receiver_seconds,clock_seconds\n" if csv_format else ""
+    return header + "\n".join(lines) + "\n", {
         "satellite": satellite,
         "time_system": "receiver time, seconds since 2000-01-01 12:00:00; not UTC",
         "target": "eps_time [s]; GPS Time = rcv_time + eps_time",
@@ -66,12 +70,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("files", type=Path, nargs="+", help="Explicit native daily CLK1B files, same satellite")
     parser.add_argument("--satellite", choices=["C", "D"], required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True, help=".csv for main.py, .txt for the full merged record")
     args = parser.parse_args()
     manifest_path = args.output.with_suffix(".manifest.json")
     if args.output.exists() or manifest_path.exists():
         parser.error("Output or manifest exists; choose a new output path.")
-    text, manifest = merge_native(args.files, args.satellite)
+    text, manifest = merge_native(args.files, args.satellite, csv_format=args.output.suffix.lower() == ".csv")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(text, encoding="utf-8", newline="\n")
     manifest["output_file"] = args.output.name

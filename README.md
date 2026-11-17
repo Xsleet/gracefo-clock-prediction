@@ -6,6 +6,8 @@
 
 默认使用 Google 官方预训练 **TimesFM 3.0**（`google/timesfm-3.0-pytorch`），没有在钟差数据上微调，也没有加载 LoRA；本例是零样本预测。模型自身的内部去趋势保留官方默认设置。
 
+[**下载 C 星钟差 CSV**](https://raw.githubusercontent.com/Xsleet/gracefo-clock-prediction/main/data/clock.csv) · [**数据字段、原始文件下载和自定义实验**](data/README.md)
+
 ```text
 读数据 → 取历史 → 三种模型预测 → 与真实值比较 → 看同一张去趋势图
 ```
@@ -106,4 +108,4 @@ python compare_windows.py --device cpu
 
 用 GPU 时把 `cpu` 换成 `gpu`。编号 1–4 对应 6 月 2 日的 00、06、12、18 时，5–8 对应 6 月 3 日相同小时，均为接收机时间。单窗口的图和 CSV 保存在 `outputs/timesfm-cpu/window-01` 至 `window-08`，汇总图和表保存在 `outputs/windows-cpu/`（GPU 为 `windows-gpu`）。
 
-数据使用说明见 [data/README.md](data/README.md)；模型权重限教学研究等许可用途，见 [来源与许可](DATA_SOURCES.md)。早期包含更多基线的实验保存在 [advanced/](advanced/README.md)，其统计口径与本次三模型比较分开。
+后续实验可通过 `--data` 换成自己的钟差 CSV，或用 `--origin` 指定接收机时刻。原始 CLK1B 转换和完整命令见 [数据与使用方法](data/README.md)。来源与许可见 [DATA_SOURCES.md](DATA_SOURCES.md)，早期实验见 [advanced/](advanced/README.md)。
